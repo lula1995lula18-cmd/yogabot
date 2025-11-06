@@ -1,4 +1,4 @@
-import os
+сimport os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -12,9 +12,6 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN')
 
 if not BOT_TOKEN:
     logger.error("Токен бота не найден! Убедитесь, что переменная BOT_TOKEN установлена в Render.")
-    # Вместо exit(1), лучше просто залогировать ошибку и позволить приложению завершиться,
-    # но в реальном продакшене лучше оставить exit(1) или raise, чтобы предотвратить запуск без токена.
-    # Для этого примера оставим exit(1) как было.
     exit(1)
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (КЛАВИАТУРЫ) ==========
@@ -218,18 +215,51 @@ async def show_help(query, context):
         parse_mode='Markdown'
     )
 
-# ========== ЗАПУСК БОТА ==========
+# ========== ЗАПУСК БОТА (ПЕРЕКЛЮЧЕНИЕ НА WEBHOOK) ==========
+# Для хостинга на Render нужно использовать Webhook, так как Render Web Services
+# ожидают, что приложение будет слушать HTTP порт.
+
 def main():
-    """Запуск бота."""
-    application = Application.builder().token(BOT_TOKEN).build()
+    """Запуск бота с использованием Webhook."""
+    try:
+        # Render автоматически предоставляет PORT
+        PORT = int(os.environ.get('PORT', '5000')) 
+    except ValueError:
+        logger.error("Переменная PORT должна быть числом.")
+        PORT = 5000
+
+    # WEBHOOK_URL - это URL, который предоставит Render (например, https://my-yoga-bot.onrender.com)
+    # Его нужно установить как переменную окружения в Render.
+    WEBHOOK_URL = os.environ.get('WEBHOOK_URL') 
     
-    # Обработчики команд
+    if not WEBHOOK_URL:
+        logger.error("Переменная WEBHOOK_URL не установлена. Webhook не может быть настроен.")
+        # Для развертывания на Render Web Service это критическая ошибка.
+        raise RuntimeError("WEBHOOK_URL is not set. Cannot run Webhook.")
+
+    # 1. Сборка приложения
+    application = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .build()
+    )
+
+    # 2. Добавление обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    logger.info("Бот запущен и использует run_polling!")
-    # run_polling подходит для запуска на Render в небольших проектах или локально
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # 3. Запуск Webhook
+    # run_webhook стартует HTTP-сервер, который слушает запросы от Render,
+    # что решает проблему с 'AttributeError'.
+    logger.info(f"Настройка Webhook на URL: {WEBHOOK_URL}, Порт: {PORT}")
+    
+    # Рекомендуется использовать BOT_TOKEN как часть url_path для безопасности
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=BOT_TOKEN, 
+        webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}"
+    )
 
 if __name__ == '__main__':
     main()
