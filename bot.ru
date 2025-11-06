@@ -1,4 +1,4 @@
-import os
+сimport os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -40,11 +40,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == 'start_test':
         await test_1(query, context)
     elif data == 'schedule':
-        await show_schedule(query)
+        await show_schedule(query, context)
     elif data == 'courses':
-        await show_courses(query)
+        await show_courses(query, context)
     elif data == 'help':
-        await show_help(query)
+        await show_help(query, context)
+    elif data.startswith('test_'):
+        await test_2(query, context)
+    elif data.startswith('level_'):
+        await test_3(query, context)
+    elif data.startswith('zone_'):
+        context.user_data['zone'] = data
+        await show_result(query, context)
 
 # ========== ТЕСТ ДЛЯ ПОДБОРА КУРСА ==========
 async def test_1(query, context):
@@ -111,7 +118,9 @@ async def show_result(query, context):
     else:
         recommendation = "Базовый курс медитации"
         url = "https://your-site.com/basic-course"
-keyboard = [[InlineKeyboardButton("💎 Получить курс", url=url)]]
+    
+    # ИСПРАВЛЕНО: добавлен отступ
+    keyboard = [[InlineKeyboardButton("💎 Получить курс", url=url)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.edit_message_text(
@@ -123,7 +132,7 @@ keyboard = [[InlineKeyboardButton("💎 Получить курс", url=url)]]
     )
 
 # ========== ДРУГИЕ ФУНКЦИИ ==========
-async def show_schedule(query):
+async def show_schedule(query, context):
     await query.edit_message_text(
         "📅 **Расписание занятий:**\n\n"
         "ПН/СР/ПТ - 9:00 Утренняя практика\n"
@@ -132,7 +141,7 @@ async def show_schedule(query):
         parse_mode='Markdown'
     )
 
-async def show_courses(query):
+async def show_courses(query, context):
     keyboard = [
         [InlineKeyboardButton("🧘‍♀️ Для начинающих", url="https://your-site.com/beginner")],
         [InlineKeyboardButton("🔥 Для продвинутых", url="https://your-site.com/advanced")],
@@ -147,7 +156,7 @@ async def show_courses(query):
         parse_mode='Markdown'
     )
 
-async def show_help(query):
+async def show_help(query, context):
     await query.edit_message_text(
         "❓ **Помощь:**\n\n"
         "По вопросам оплаты и доступа к курсам - @your_username\n"
@@ -163,13 +172,9 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    # Обработчики теста
-    application.add_handler(CallbackQueryHandler(test_2, pattern='^test_'))
-    application.add_handler(CallbackQueryHandler(test_3, pattern='^level_'))
-    application.add_handler(CallbackQueryHandler(show_result, pattern='^zone_'))
-    
     logger.info("Бот запущен!")
     application.run_polling()
 
-if name == '__main__':
+# ИСПРАВЛЕНО: правильное условие запуска
+if __name__ == '__main__':
     main()
